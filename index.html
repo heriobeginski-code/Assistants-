@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Command Center | Aurora MVP</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-deep: #121212;
+            --teal-accent: #0D9488;
+            --blue-accent: #1E293B;
+        }
+
+        body {
+            background-color: var(--bg-deep);
+            color: white;
+            font-family: 'Inter', sans-serif;
+            overflow-x: hidden;
+            min-height: 100vh;
+        }
+
+        /* --- GPU Accelerated Aurora Background --- */
+        .aurora-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+            overflow: hidden;
+            background: radial-gradient(circle at 50% -20%, #1e293b, #121212);
+        }
+
+        .aurora-blob {
+            position: absolute;
+            width: 600px;
+            height: 600px;
+            background: var(--teal-accent);
+            filter: blur(100px);
+            opacity: 0.15;
+            border-radius: 50%;
+            z-index: -1;
+            animation: float 20s infinite alternate ease-in-out;
+            will-change: transform;
+        }
+
+        .aurora-blob-2 {
+            background: #3b82f6;
+            right: -10%;
+            top: 20%;
+            animation-delay: -5s;
+        }
+
+        @keyframes float {
+            0% { transform: translate(0, 0) scale(1); }
+            50% { transform: translate(100px, 50px) scale(1.1); }
+            100% { transform: translate(-50px, 100px) scale(0.9); }
+        }
+
+        /* --- Glassmorphism --- */
+        .glass {
+            background: rgba(255, 255, 255, 0.03);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px border rgba(255, 255, 255, 0.1);
+            border-radius: 16px;
+        }
+
+        .glass-pill {
+            background: rgba(20, 20, 20, 0.6);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        /* --- Search Overlay --- */
+        #search-overlay {
+            display: none;
+            backdrop-filter: blur(30px);
+            background: rgba(18, 18, 18, 0.8);
+        }
+
+        .modal-enter { animation: fadeIn 0.2s ease-out; }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: scale(0.95); }
+            to { opacity: 1; transform: scale(1); }
+        }
+
+        .card-hidden { display: none; }
+
+        input:focus { outline: none; border-color: var(--teal-accent); }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 10px; }
+    </style>
+</head>
+<body>
+
+    <div class="aurora-container">
+        <div class="aurora-blob"></div>
+        <div class="aurora-blob aurora-blob-2"></div>
+    </div>
+
+    <header class="fixed top-6 left-1/2 -translate-x-1/2 z-50">
+        <div class="glass-pill px-6 py-3 rounded-full flex items-center space-x-8 shadow-2xl">
+            <button onclick="toggleModal('library-modal')" class="text-sm font-medium hover:text-teal-400 transition-colors uppercase tracking-widest">
+                Prompt Library
+            </button>
+            <div class="h-4 w-px bg-white/20"></div>
+            <button onclick="openSearch()" class="hover:scale-110 transition-transform">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+            </button>
+        </div>
+    </header>
+
+    <main class="pt-32 pb-20 max-w-6xl mx-auto px-6">
+        <h1 class="text-3xl font-light mb-12 text-center tracking-tight text-white/90">AI <span class="text-teal-500 font-semibold">Command Center</span></h1>
+        
+        <div id="ai-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            </div>
+    </main>
+
+    <div id="search-overlay" class="fixed inset-0 z-[100] flex flex-col items-center justify-start pt-[15vh]">
+        <div class="w-full max-w-2xl px-6 relative">
+            <input type="text" id="search-input" placeholder="Search AI Command..." 
+                   class="w-full bg-transparent text-4xl font-light text-white border-b border-white/20 pb-4 focus:border-teal-500 transition-all">
+            <button onclick="closeSearch()" class="absolute right-10 top-2 text-gray-400 hover:text-white transition-colors">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+            </button>
+        </div>
+    </div>
+
+    <div id="detail-modal" class="fixed inset-0 z-[110] hidden bg-black/60 backdrop-blur-md flex items-center justify-center p-4">
+        <div class="glass w-full max-w-lg p-8 modal-enter">
+            <div class="flex justify-between items-start mb-6">
+                <h2 id="modal-ai-name" class="text-2xl font-semibold">AI Name</h2>
+                <button onclick="toggleModal('detail-modal')" class="text-gray-400 hover:text-white text-2xl">&times;</button>
+            </div>
+            
+            <div class="space-y-4">
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="text-[10px] uppercase text-gray-400 font-bold">Tier</label>
+                        <p id="modal-tier" class="text-teal-400">Paid</p>
+                    </div>
+                    <div>
+                        <label class="text-[10px] uppercase text-gray-400 font-bold">Login Method</label>
+                        <input id="edit-login" class="bg-white/5 border border-white/10 rounded px-2 py-1 w-full text-sm mt-1">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="text-[10px] uppercase text-gray-400 font-bold">Launch URL</label>
+                    <input id="edit-url" class="bg-white/5 border border-white/10 rounded px-2 py-1 w-full text-sm mt-1 font-mono">
+                </div>
+
+                <div>
+                    <label class="text-[10px] uppercase text-gray-400 font-bold">Custom Prompt Guide</label>
+                    <textarea id="edit-notes" rows="4" class="bg-white/5 border border-white/10 rounded px-2 py-1 w-full text-sm mt-1"></textarea>
+                </div>
+
+                <div class="pt-4 flex space-x-3">
+                    <button id="save-btn" class="flex-1 bg-teal-600 hover:bg-teal-500 py-3 rounded-lg font-semibold transition-all shadow-lg shadow-teal-900/20">Save Changes</button>
+                    <button id="launch-btn" class="flex-1 bg-white/10 hover:bg-white/20 py-3 rounded-lg font-semibold transition-all">Launch AI</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="library-modal" class="fixed inset-0 z-[110] hidden bg-black/80 backdrop-blur-xl flex items-center justify-center p-4">
+        <div class="glass w-full max-w-3xl h-[80vh] overflow-hidden flex flex-col p-8 modal-enter">
+            <div class="flex justify-between items-center mb-8">
+                <h2 class="text-2xl font-light">Prompt <span class="font-bold">Library</span></h2>
+                <button onclick="toggleModal('library-modal')" class="text-gray-400 hover:text-white text-3xl">&times;</button>
+            </div>
+            
+            <div class="overflow-y-auto space-y-8 pr-4">
+                <section>
+                    <h3 class="text-teal-400 text-xs font-bold uppercase tracking-widest mb-4">Suggested Workflows</h3>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+                        <div class="p-3 bg-white/5 rounded-lg">Legal Writing → <span class="text-white/60">Claude / CoCounsel</span></div>
+                        <div class="p-3 bg-white/5 rounded-lg">Contract Review → <span class="text-white/60">Spellbook / goHeather</span></div>
+                        <div class="p-3 bg-white/5 rounded-lg">Factual Audits → <span class="text-white/60">Perplexity / Julius</span></div>
+                        <div class="p-3 bg-white/5 rounded-lg">Strategy → <span class="text-white/60">ChatGPT / Grok-3</span></div>
+                    </div>
+                </section>
+
+                <section>
+                    <h3 class="text-teal-400 text-xs font-bold uppercase tracking-widest mb-4">Framework Definitions</h3>
+                    <div id="framework-list" class="space-y-4">
+                        </div>
+                </section>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Initial Data
+        const defaultAIs = [
+            { id: 1, name: 'Perplexity', specialty: 'Factual Researcher', url: 'https://www.perplexity.ai', tier: 'Free/Pro', login: 'Google/SSO', notes: 'Best for web-grounded research.' },
+            { id: 2, name: 'ChatGPT', specialty: 'Logic & Drafting', url: 'https://chatgpt.com', tier: 'Pro (o3)', login: 'OpenAI Auth', notes: 'General purpose logic reasoning.' },
+            { id: 3, name: 'Grok-3', specialty: 'Live Context', url: 'https://x.ai/grok', tier: 'Premium', login: 'X Login', notes: 'Real-time social/news context.' },
+            { id: 4, name: 'Julius AI', specialty: 'Evidence Analyst', url: 'https://julius.ai', tier: 'Pro', login: 'Email', notes: 'Data science and spreadsheet analysis.' },
+            { id: 5, name: 'Irys', specialty: 'Matter Workspace', url: 'https://www.irys.ai', tier: 'Enterprise', login: 'SSO', notes: 'Unified drafting environment.' },
+            { id: 6, name: 'Claude', specialty: 'Appellate Writer', url: 'https://claude.ai', tier: 'Pro', login: 'Anthropic Auth', notes: 'Nuanced, human-like legal prose.' },
+            { id: 7, name: 'Harvey', specialty: 'Enterprise Copilot', url: 'https://www.harvey.ai', tier: 'Enterprise', login: 'SSO', notes: 'Specialized legal LLM.' },
+            { id: 8, name: 'CoCounsel', specialty: 'Brief Assembly', url: 'https://www.counsel.ai', tier: 'Enterprise', login: 'Casetext SSO', notes: 'Automated brief creation.' },
+            { id: 9, name: 'Spellbook', specialty: 'Contract Specialist', url: 'https://www.spellbook.legal', tier: 'Pro', login: 'MS Word Add-in', notes: 'AI within contract templates.' },
+            { id: 10, name: 'goHeather', specialty: 'Contract Redlining', url: 'https://www.goheather.io', tier: 'Subscription', login: 'Email', notes: 'Fast automated markup.' }
+        ];
+
+        const frameworks = [
+            { name: 'COSTAR', def: '(Context, Objective, Style, Tone, Audience, Response) – Professional drafting.' },
+            { name: 'CoT', def: '(Chain of Thought) – "Think step-by-step" for complex legal logic.' },
+            { name: 'RACE', def: '(Role, Action, Context, Expectation) – Fast execution.' },
+            { name: 'CLEAR', def: '(Context, Logic, Expectations, Action, Restrictions) – Structured research.' },
+            { name: 'FOCUS', def: '(Function, Outcome, Criteria, Assumptions, Strategy) – Raw data, no filler.' },
+            { name: 'RTF', def: '(Role, Task, Format) – Fast data extraction (CSV/Table).' },
+            { name: 'RISEN', def: '(Role, Input, Steps, Expectation, Narrowing) – High-stakes brief drafting.' },
+            { name: 'Meta-Prompting', def: 'Asking the AI to generate a better prompt for you.' },
+            { name: 'CARE', def: '(Context, Action, Result, Example) – Stylistic matching.' },
+            { name: 'ToT', def: '(Tree of Thought) – Strategic "branching" of legal arguments.' }
+        ];
+
+        let aiData = JSON.parse(localStorage.getItem('ai_command_data')) || defaultAIs;
+        let activeAIId = null;
+
+        // --- Core Functions ---
+
+        function init() {
+            renderGrid(aiData);
+            renderFrameworks();
+            setupSearch();
+        }
+
+        function renderGrid(data) {
+            const grid = document.getElementById('ai-grid');
+            grid.innerHTML = data.map(ai => `
+                <div class="glass p-6 cursor-pointer hover:border-teal-500/50 transition-all group card-item" data-id="${ai.id}" data-name="${ai.name.toLowerCase()}">
+                    <div class="flex justify-between items-start mb-4">
+                        <div class="h-10 w-10 rounded bg-teal-500/10 flex items-center justify-center text-teal-400 font-bold">
+                            ${ai.name.charAt(0)}
+                        </div>
+                        <span class="text-[10px] text-white/30 font-bold uppercase tracking-tighter">${ai.tier}</span>
+                    </div>
+                    <h3 class="text-xl font-semibold group-hover:text-teal-400 transition-colors">${ai.name}</h3>
+                    <p class="text-gray-400 text-sm mt-1">${ai.specialty}</p>
+                    <div class="mt-6 flex justify-end">
+                        <span class="text-xs text-teal-500 opacity-0 group-hover:opacity-100 transition-opacity">Manage &rarr;</span>
+                    </div>
+                </div>
+            `).join('');
+
+            // Click Events
+            document.querySelectorAll('.card-item').forEach(card => {
+                card.addEventListener('click', () => openDetail(card.dataset.id));
+            });
+        }
+
+        function renderFrameworks() {
+            const container = document.getElementById('framework-list');
+            container.innerHTML = frameworks.map(f => `
+                <div class="border-l-2 border-teal-900 pl-4 py-1">
+                    <span class="font-bold text-teal-400">${f.name}:</span>
+                    <span class="text-gray-300 ml-2">${f.def}</span>
+                </div>
+            `).join('');
+        }
+
+        // --- Interaction Logic ---
+
+        function openDetail(id) {
+            const ai = aiData.find(a => a.id == id);
+            activeAIId = id;
+            document.getElementById('modal-ai-name').innerText = ai.name;
+            document.getElementById('modal-tier').innerText = ai.tier;
+            document.getElementById('edit-login').value = ai.login;
+            document.getElementById('edit-url').value = ai.url;
+            document.getElementById('edit-notes').value = ai.notes;
+            
+            toggleModal('detail-modal');
+        }
+
+        function toggleModal(id) {
+            const m = document.getElementById(id);
+            m.classList.toggle('hidden');
+        }
+
+        document.getElementById('save-btn').onclick = () => {
+            const aiIndex = aiData.findIndex(a => a.id == activeAIId);
+            aiData[aiIndex].login = document.getElementById('edit-login').value;
+            aiData[aiIndex].url = document.getElementById('edit-url').value;
+            aiData[aiIndex].notes = document.getElementById('edit-notes').value;
+            
+            localStorage.setItem('ai_command_data', JSON.stringify(aiData));
+            toggleModal('detail-modal');
+            renderGrid(aiData);
+        };
+
+        document.getElementById('launch-btn').onclick = () => {
+            const url = document.getElementById('edit-url').value;
+            window.open(url, '_blank');
+        };
+
+        // --- Search System ---
+
+        function openSearch() {
+            document.getElementById('search-overlay').style.display = 'flex';
+            document.getElementById('search-input').focus();
+        }
+
+        function closeSearch() {
+            document.getElementById('search-overlay').style.display = 'none';
+            document.getElementById('search-input').value = '';
+            renderGrid(aiData); // Reset view
+        }
+
+        function setupSearch() {
+            const input = document.getElementById('search-input');
+            input.addEventListener('input', (e) => {
+                const term = e.target.value.toLowerCase();
+                const cards = document.querySelectorAll('.card-item');
+                
+                cards.forEach(card => {
+                    const name = card.dataset.name;
+                    if (name.includes(term)) {
+                        card.classList.remove('card-hidden');
+                    } else {
+                        card.classList.add('card-hidden');
+                    }
+                });
+            });
+
+            // Close search on ESC
+            window.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape') closeSearch();
+            });
+        }
+
+        init();
+    </script>
+</body>
+</html>
